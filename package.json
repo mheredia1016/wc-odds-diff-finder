@@ -1,0 +1,17 @@
+{
+  "name": "sgo-odds-diff-bot",
+  "version": "1.0.0",
+  "description": "SportsGameOdds odds difference Discord alert bot",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "scan": "node src/index.js --once"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  }
+}
