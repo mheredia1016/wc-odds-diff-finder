@@ -1,17 +1,17 @@
 {
-  "name": "soccer-props-scraper-bot",
+  "name": "odds-api-soccer-diff-bot",
   "version": "1.0.0",
-  "description": "Compares soccer player prop odds across sportsbook pages and posts Discord alerts.",
-  "type": "module",
+  "description": "Soccer odds difference scanner using The Odds API and Discord alerts.",
   "main": "src/index.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node src/index.js",
-    "scan": "node src/index.js --once",
-    "debug": "DEBUG_SCRAPE=true node src/index.js --once"
+    "scan": "node src/index.js --once"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
-    "dotenv": "^16.4.7",
-    "playwright": "^1.49.1"
-  },
-  "devDependencies": {}
+    "dotenv": "^16.4.7"
+  }
 }

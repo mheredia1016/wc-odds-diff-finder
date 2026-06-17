@@ -1,52 +1,51 @@
-import { config } from './config.js';
-
 function fmtOdds(n) {
   return n > 0 ? `+${n}` : String(n);
 }
 
-function fmtTime(value) {
-  if (!value) return 'TBD';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+function fmtDate(iso) {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Chicago',
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
 }
 
-export function buildDiscordMessage(alerts) {
-  const top = alerts.slice(0, 10);
+function buildMessage(alert) {
+  const books = alert.prices.slice(0, 8).map(p => `• ${p.bookTitle}: **${fmtOdds(p.price)}**`).join('\n');
   return {
-    username: 'Odds Difference Bot',
-    embeds: top.map((alert) => ({
-      title: `🚨 Odds Difference: +${alert.diff}`,
-      description: [
-        `**${alert.best.player}**`,
-        `Market: **${alert.best.marketName}**`,
-        alert.best.line !== '' ? `Line: **${alert.best.line}**` : null,
-        `Side: **${alert.best.side}**`,
-        '',
-        `Best: **${alert.best.bookmakerId} ${fmtOdds(alert.best.odds)}**`,
-        `Low: **${alert.worst.bookmakerId} ${fmtOdds(alert.worst.odds)}**`,
-        '',
-        `Event: ${alert.best.eventName}`,
-        `Start: ${fmtTime(alert.best.startTime)}`,
-        '',
-        `All books: ${alert.allPrices.slice(0, 8).map((p) => `${p.bookmakerId} ${fmtOdds(p.odds)}`).join(' | ')}`
-      ].filter(Boolean).join('\n')
-    }))
+    embeds: [{
+      title: `🚨 Soccer Odds Difference +${alert.diff}`,
+      description: `**${alert.awayTeam} @ ${alert.homeTeam}**\n${fmtDate(alert.commenceTime)} CT`,
+      fields: [
+        { name: 'Market', value: `${alert.market} — **${alert.label}**`, inline: false },
+        { name: 'Best', value: `${alert.best.bookTitle} **${fmtOdds(alert.best.price)}**`, inline: true },
+        { name: 'Lowest', value: `${alert.worst.bookTitle} **${fmtOdds(alert.worst.price)}**`, inline: true },
+        { name: 'Books', value: books || 'No books', inline: false }
+      ],
+      timestamp: new Date().toISOString()
+    }]
   };
 }
 
-export async function postDiscord(alerts) {
-  if (!alerts.length) return;
+async function postDiscord(webhookUrl, payload) {
+  if (!webhookUrl) {
+    console.log('DISCORD_WEBHOOK_URL missing; skipping Discord post');
+    return;
+  }
 
-  const payload = buildDiscordMessage(alerts);
-  const res = await fetch(config.discordWebhookUrl, {
+  const res = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload)
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => '');
     throw new Error(`Discord webhook failed ${res.status}: ${text}`);
   }
 }
+
+module.exports = { buildMessage, postDiscord };

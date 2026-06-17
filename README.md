@@ -1,105 +1,55 @@
-# Soccer Props Odds Difference Bot
+# Odds API Soccer Difference Bot
 
-Playwright scanner for soccer player props. It compares configured sportsbooks and posts to Discord when the best American odds are at least `MIN_ODDS_DIFF` higher than the lowest book.
+Compares soccer odds across sportsbooks using **The Odds API** and posts Discord alerts when the best available odds are at least `MIN_ODDS_DIFF` higher than the lowest odds for the same event/market/outcome.
 
-Example: Fanatics +135 vs DraftKings +1600 = +1465 alert.
-
-## Important
-
-This does **not** bypass sportsbook login, geolocation, bot protection, or terms. It only reads pages that your browser/server can load. If a book blocks Railway, use residential proxies or run it on a machine that can access the pages normally.
-
-## What Changed
-
-This version no longer requires direct event URLs. With `AUTO_NAVIGATE=true`, it starts from each book's soccer page, tries to open soccer events/player props, scrolls the prop markets, parses visible text, then compares books.
-
-Start books recommended:
-
-```env
-BOOKS=draftkings,fanatics,fanduel
-```
-
-Add BetMGM/Caesars/ESPN BET later once the first three parse props.
+This version is for **soccer game lines** first: `h2h`, `spreads`, and `totals`. The Odds API may not have the soccer player props like offsides/shots that started the project.
 
 ## Railway Variables
 
 ```env
-DISCORD_WEBHOOK_URL=your_new_webhook
+ODDS_API_KEY=your_key_here
+DISCORD_WEBHOOK_URL=your_webhook_here
+SPORT_KEYS=soccer_epl,soccer_uefa_champs_league,soccer_usa_mls,soccer_spain_la_liga,soccer_italy_serie_a,soccer_germany_bundesliga,soccer_france_ligue_one
+MARKETS=h2h,spreads,totals
+REGIONS=us
 MIN_ODDS_DIFF=300
 SCAN_INTERVAL_MINUTES=5
-HEADLESS=true
-DEBUG_SCRAPE=false
-AUTO_NAVIGATE=true
-MAX_EVENTS_PER_BOOK=8
-BOOKS=draftkings,fanatics,fanduel
-TIMEZONE_ID=America/Chicago
+MAX_EVENTS_PER_SPORT=20
+COMMENCE_WITHIN_HOURS=72
 ```
 
-## Proxy Variables
-
-One proxy:
+Optional:
 
 ```env
-PROXY_SERVER=http://user:pass@host:port
+BOOKMAKERS=draftkings,fanduel,betmgm,caesars,espnbet,betrivers,fanatics
+POST_NO_ALERTS=true
 ```
 
-Multiple proxies, rotated by book:
+Leave `BOOKMAKERS` blank to compare all available books from `REGIONS=us`.
 
-```env
-PROXY_SERVERS=http://user:pass@host1:port,http://user:pass@host2:port,http://user:pass@host3:port
-```
-
-If your proxy provider uses separate auth fields:
-
-```env
-PROXY_SERVER=http://host:port
-PROXY_USERNAME=username
-PROXY_PASSWORD=password
-```
-
-## Optional Direct URL Overrides
-
-If auto navigation fails for a book, paste direct soccer/event/player-prop URLs here. If a URL variable is set, the bot uses those URLs instead of auto navigation for that book.
-
-```env
-DRAFTKINGS_URLS=https://...
-FANATICS_URLS=https://...
-FANDUEL_URLS=https://...
-BETMGM_URLS=https://...
-CAESARS_URLS=https://...
-ESPNBET_URLS=https://...
-```
-
-Multiple URLs can be comma-separated.
-
-## Local Test
+## Run locally
 
 ```bash
 npm install
-npx playwright install chromium
 cp .env.example .env
+npm start
+```
+
+Run one scan only:
+
+```bash
 npm run scan
 ```
 
-Debug extraction:
+## GitHub + Railway
 
-```bash
-DEBUG_SCRAPE=true npm run scan
-```
-
-Look for:
-
-```txt
-book: event links [...]
-book: parsed X props
-```
-
-If a book parses `0 props`, the site either blocked the browser, did not expose text in the DOM, or the page layout needs a book-specific parser.
-
-## Deploy on GitHub + Railway
-
-1. Upload this folder to a new GitHub repo.
-2. Create a Railway project from that repo.
+1. Upload these files to a new GitHub repo.
+2. Create a Railway project from the repo.
 3. Add the Railway variables above.
-4. Add your Discord webhook in Railway only.
-5. Deploy.
-6. Watch logs for parsed props.
+4. Deploy.
+
+## Notes
+
+- The Odds API counts requests by sport, market, and bookmaker grouping. Keep the sport list short on free tier.
+- `SPORT_KEYS=AUTO` will call `/v4/sports` and scan every active soccer sport. This can use credits quickly.
+- For soccer, `h2h` includes the draw outcome.

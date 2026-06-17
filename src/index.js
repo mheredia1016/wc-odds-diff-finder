@@ -1,65 +1,73 @@
-import { chromium } from 'playwright';
-import { config } from './config.js';
-import { scrapeBook } from './books/index.js';
-import { findAlerts, formatAlert } from './compare.js';
-import { postDiscord } from './lib/discord.js';
-import { loadSeen, saveSeen } from './lib/seen.js';
+const config = require('./config');
+const { getActiveSoccerSports, getOddsForSport } = require('./oddsApi');
+const { findAlerts, alertId } = require('./compare');
+const { buildMessage, postDiscord } = require('./discord');
+const { loadSeen, saveSeen } = require('./seen');
 
-const once = process.argv.includes('--once');
-const seen = loadSeen();
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-async function scan() {
-  console.log(`Scanning books: ${config.books.join(', ')}`);
-  const browser = await chromium.launch({
-    headless: config.headless,
-    args: ['--no-sandbox', '--disable-dev-shm-usage']
-  });
+async function resolveSports() {
+  if (config.sportKeysRaw.trim().toUpperCase() === 'AUTO') {
+    const sports = await getActiveSoccerSports(config.apiKey);
+    console.log(`AUTO soccer sports: ${sports.join(', ') || 'none'}`);
+    return sports;
+  }
+  return config.sportKeys;
+}
 
-  const allProps = [];
-  try {
-    for (const bookId of config.books) {
-      try {
-        const props = await scrapeBook({
-          browser,
-          bookId,
-          urls: config.urls[bookId] || [],
-          debug: config.debug,
-          autoNavigate: config.autoNavigate,
-          maxEventsPerBook: config.maxEventsPerBook,
-          proxy: config.proxies.length ? config.proxies[config.books.indexOf(bookId) % config.proxies.length] : undefined
-        });
-        console.log(`${bookId}: parsed ${props.length} props`);
-        allProps.push(...props);
-      } catch (err) {
-        console.error(`${bookId}: failed`, err.message);
-      }
+async function scanOnce() {
+  if (!config.apiKey) throw new Error('Missing ODDS_API_KEY');
+
+  const sports = await resolveSports();
+  console.log(`Scanning soccer sports: ${sports.join(', ')}`);
+  console.log(`Markets: ${config.markets.join(', ')} | Regions: ${config.regions} | Bookmakers: ${config.bookmakers.join(', ') || 'all in region'}`);
+
+  const allEvents = [];
+  for (const sportKey of sports) {
+    try {
+      const events = await getOddsForSport(sportKey, config);
+      console.log(`${sportKey}: loaded ${events.length} events`);
+      allEvents.push(...events.map(e => ({ ...e, sport_key: sportKey })));
+      await sleep(250);
+    } catch (err) {
+      console.error(`${sportKey}: failed - ${err.message}`);
     }
-  } finally {
-    await browser.close().catch(() => {});
   }
 
-  console.log(`Total props loaded: ${allProps.length}`);
-  const alerts = findAlerts(allProps, config.minOddsDiff);
+  console.log(`Total events loaded: ${allEvents.length}`);
+  const alerts = findAlerts(allEvents, config.minOddsDiff);
   console.log(`Alerts found: ${alerts.length}`);
 
+  const seen = loadSeen();
   let posted = 0;
+
   for (const alert of alerts.slice(0, 20)) {
-    const alertId = `${alert.key}|${alert.best.bookId}|${alert.best.odds}|${alert.worst.bookId}|${alert.worst.odds}`;
-    if (seen.has(alertId)) continue;
-    await postDiscord(config.discordWebhookUrl, formatAlert(alert));
-    seen.add(alertId);
-    posted++;
+    const id = alertId(alert);
+    if (seen.has(id)) continue;
+    await postDiscord(config.discordWebhookUrl, buildMessage(alert));
+    seen.add(id);
+    posted += 1;
+    await sleep(500);
   }
+
+  if (posted === 0 && config.postNoAlerts) {
+    await postDiscord(config.discordWebhookUrl, { content: `No new soccer odds differences >= ${config.minOddsDiff}. Events scanned: ${allEvents.length}` });
+  }
+
   saveSeen(seen);
   console.log(`New alerts posted: ${posted}`);
 }
 
 async function main() {
-  await scan();
+  const once = process.argv.includes('--once');
+  await scanOnce();
   if (once) return;
-  const ms = config.scanIntervalMinutes * 60 * 1000;
+
+  const intervalMs = config.scanIntervalMinutes * 60 * 1000;
   console.log(`Running every ${config.scanIntervalMinutes} minutes`);
-  setInterval(() => scan().catch(err => console.error('Scan failed:', err)), ms);
+  setInterval(() => {
+    scanOnce().catch(err => console.error(err));
+  }, intervalMs);
 }
 
 main().catch(err => {
