@@ -1,55 +1,57 @@
-# Odds API Soccer Difference Bot
+# The Odds API Soccer Difference Bot
 
-Compares soccer odds across sportsbooks using **The Odds API** and posts Discord alerts when the best available odds are at least `MIN_ODDS_DIFF` higher than the lowest odds for the same event/market/outcome.
+Compares soccer odds across sportsbooks and posts Discord alerts when the best price is at least `MIN_ODDS_DIFF` higher than the worst price for the same market/player/line.
 
-This version is for **soccer game lines** first: `h2h`, `spreads`, and `totals`. The Odds API may not have the soccer player props like offsides/shots that started the project.
+This version supports **event-level player props**, which are required by The Odds API for markets like player shots and shots on target.
 
-## Railway Variables
+## Railway variables
 
 ```env
-ODDS_API_KEY=your_key_here
-DISCORD_WEBHOOK_URL=your_webhook_here
-SPORT_KEYS=soccer_epl,soccer_uefa_champs_league,soccer_usa_mls,soccer_spain_la_liga,soccer_italy_serie_a,soccer_germany_bundesliga,soccer_france_ligue_one
-MARKETS=h2h,spreads,totals
+ODDS_API_KEY=your_key
+DISCORD_WEBHOOK_URL=your_webhook
+SPORT_KEYS=soccer_fifa_world_cup
 REGIONS=us
+BOOKMAKERS=draftkings,fanduel,betmgm,betrivers,fanatics
 MIN_ODDS_DIFF=300
 SCAN_INTERVAL_MINUTES=5
-MAX_EVENTS_PER_SPORT=20
 COMMENCE_WITHIN_HOURS=72
+MAX_EVENTS_PER_SPORT=20
 ```
 
-Optional:
+## Player prop markets
+
+Start with:
 
 ```env
-BOOKMAKERS=draftkings,fanduel,betmgm,caesars,espnbet,betrivers,fanatics
-POST_NO_ALERTS=true
+MARKETS=player_shots,player_shots_on_target,player_goal_scorer_anytime,player_goals_alternate,player_assists,player_tackles_alternate,player_fouls,player_to_receive_card
 ```
 
-Leave `BOOKMAKERS` blank to compare all available books from `REGIONS=us`.
+The bot automatically calls:
 
-## Run locally
-
-```bash
-npm install
-cp .env.example .env
-npm start
+```txt
+/v4/sports/{sportKey}/events
+/v4/sports/{sportKey}/events/{eventId}/odds
 ```
 
-Run one scan only:
+for player markets. This avoids the `INVALID_MARKET` error from the sport-level `/odds` endpoint.
 
-```bash
-npm run scan
+## Normal game markets
+
+You can also scan normal markets:
+
+```env
+MARKETS=h2h,spreads,totals,btts,draw_no_bet
 ```
 
-## GitHub + Railway
+Normal markets use the sport-level endpoint. If you mix normal and player markets, the bot uses both endpoint types.
 
-1. Upload these files to a new GitHub repo.
-2. Create a Railway project from the repo.
-3. Add the Railway variables above.
-4. Deploy.
+## Helpful settings
 
-## Notes
+`EVENT_MARKET_CHUNK_SIZE=1` is safest because some events/books do not support every prop market. It costs more API calls but prevents one invalid market from killing the whole scan.
 
-- The Odds API counts requests by sport, market, and bookmaker grouping. Keep the sport list short on free tier.
-- `SPORT_KEYS=AUTO` will call `/v4/sports` and scan every active soccer sport. This can use credits quickly.
-- For soccer, `h2h` includes the draw outcome.
+`BOOKMAKERS` can be blank to scan all books in the selected region, or a comma-separated list:
+
+```env
+BOOKMAKERS=draftkings,fanduel,betmgm,betrivers
+```
+

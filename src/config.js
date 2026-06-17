@@ -13,9 +13,9 @@ function num(name, fallback) {
 module.exports = {
   apiKey: process.env.ODDS_API_KEY,
   discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL,
-  sportKeysRaw: process.env.SPORT_KEYS || 'soccer_epl,soccer_uefa_champs_league,soccer_usa_mls',
-  sportKeys: csv('SPORT_KEYS', 'soccer_epl,soccer_uefa_champs_league,soccer_usa_mls'),
-  markets: csv('MARKETS', 'h2h,spreads,totals'),
+  sportKeysRaw: process.env.SPORT_KEYS || 'soccer_fifa_world_cup',
+  sportKeys: csv('SPORT_KEYS', 'soccer_fifa_world_cup'),
+  markets: csv('MARKETS', 'player_shots,player_shots_on_target,player_goal_scorer_anytime,player_goals_alternate,player_assists,player_tackles_alternate,player_fouls,player_to_receive_card'),
   regions: process.env.REGIONS || 'us',
   bookmakers: csv('BOOKMAKERS', ''),
   oddsFormat: process.env.ODDS_FORMAT || 'american',
@@ -23,5 +23,8 @@ module.exports = {
   scanIntervalMinutes: num('SCAN_INTERVAL_MINUTES', 5),
   maxEventsPerSport: num('MAX_EVENTS_PER_SPORT', 20),
   commenceWithinHours: num('COMMENCE_WITHIN_HOURS', 72),
+  apiDelayMs: num('API_DELAY_MS', 350),
+  eventMarketChunkSize: num('EVENT_MARKET_CHUNK_SIZE', 1),
+  forceEventOdds: String(process.env.FORCE_EVENT_ODDS || 'false').toLowerCase() === 'true',
   postNoAlerts: String(process.env.POST_NO_ALERTS || 'false').toLowerCase() === 'true'
 };
