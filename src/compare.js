@@ -1,7 +1,34 @@
 const { describePlay, isLiveEvent } = require('./normalize');
 
+function hasExcludedMarket(row, config) {
+  const text = [
+    row.raw?.marketName,
+    row.raw?.oddID,
+    row.raw?.statID,
+    row.raw?.betTypeID,
+    row.raw?.sideID,
+    row.raw?.label,
+    row.raw?.name,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  const excludes = (config.excludeMarketKeywords || [
+    'yes/no',
+    'any runs',
+    'moneyline',
+    'spread',
+    'total',
+    'ml',
+  ]);
+
+  return excludes.some(keyword => text.includes(String(keyword).toLowerCase()));
+}
+
 function compareRows(rows, config) {
   const groups = new Map();
+
   for (const row of rows) {
     if (!groups.has(row.key)) groups.set(row.key, []);
     groups.get(row.key).push(row);
@@ -15,11 +42,18 @@ function compareRows(rows, config) {
     const minDiff = isLive ? config.liveMinOddsDiff : config.minOddsDiff;
     const maxOdds = isLive ? config.liveMaxOdds : config.maxOdds;
 
+    if (hasExcludedMarket(groupRows[0], config)) continue;
+
     const byBook = new Map();
+
     for (const row of groupRows) {
+      if (row.price < 100) continue;
       if (Math.abs(row.price) > maxOdds) continue;
+
       const current = byBook.get(row.bookId);
-      if (!current || row.price > current.price) byBook.set(row.bookId, row);
+      if (!current || row.price > current.price) {
+        byBook.set(row.bookId, row);
+      }
     }
 
     const prices = [...byBook.values()].sort((a, b) => b.price - a.price);
@@ -27,6 +61,9 @@ function compareRows(rows, config) {
 
     const best = prices[0];
     const lowest = [...prices].sort((a, b) => a.price - b.price)[0];
+
+    if (best.price < 100) continue;
+
     const diff = best.price - lowest.price;
     if (diff < minDiff) continue;
 
