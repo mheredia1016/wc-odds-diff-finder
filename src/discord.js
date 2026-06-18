@@ -1,47 +1,38 @@
-import { config } from './config.js';
-import { formatAmerican, formatTime, marketLabel } from './normalize.js';
+const { BOOK_NAMES, fmtOdds, eventName, eventStart, isLiveEvent } = require('./normalize');
 
-export async function postAlert(alert) {
-  if (!config.discordWebhookUrl) {
-    console.log('No DISCORD_WEBHOOK_URL set. Alert:', alertSummary(alert));
-    return;
-  }
+function chunk(str, max = 900) {
+  if (!str) return '';
+  return str.length > max ? `${str.slice(0, max - 3)}...` : str;
+}
 
-  const payload = {
-    embeds: [{
-      title: `🚨 Soccer Odds Difference +${alert.diff}`,
-      description: `**${alert.awayTeam} @ ${alert.homeTeam}**\n${formatTime(alert.commenceTime)}`,
-      color: 15158332,
-      fields: [
-        { name: 'Player', value: alert.player || 'Unknown', inline: true },
-        { name: 'Market', value: marketLabel(alert.marketKey), inline: true },
-        { name: 'Line', value: alert.line || 'N/A', inline: true },
-        { name: 'Best', value: `**${alert.best.bookTitle} ${formatAmerican(alert.best.price)}**`, inline: true },
-        { name: 'Lowest', value: `${alert.lowest.bookTitle} ${formatAmerican(alert.lowest.price)}`, inline: true },
-        { name: 'Difference', value: `+${alert.diff}`, inline: true },
-        { name: 'Books', value: alert.prices.map(p => `• ${p.bookTitle}: ${formatAmerican(p.price)}`).join('\n').slice(0, 1000) }
-      ],
-      timestamp: new Date().toISOString()
-    }]
-  };
+function alertMessage(alert) {
+  const live = isLiveEvent(alert.event);
+  const title = live ? '⚡ LIVE DISCREPANCY' : '🚨 PREGAME DISCREPANCY';
+  const bestBook = BOOK_NAMES[alert.best.bookId] || alert.best.bookId;
+  const lowBook = BOOK_NAMES[alert.lowest.bookId] || alert.lowest.bookId;
+  const books = alert.prices
+    .map(p => `• ${BOOK_NAMES[p.bookId] || p.bookId}: ${fmtOdds(p.price)}${p.deeplink ? ' 🔗' : ''}`)
+    .join('\n');
 
-  if (config.dryRun) {
-    console.log('DRY_RUN alert:', JSON.stringify(payload, null, 2));
-    return;
-  }
+  const linkLine = alert.best.deeplink
+    ? `\n🎯 Bet Here: ${alert.best.deeplink}`
+    : '\n🎯 Bet Here: deeplink unavailable';
 
-  const res = await fetch(config.discordWebhookUrl, {
+  return `${title}\n\n${eventName(alert.event)}\n${eventStart(alert.event)}\n\n${alert.description}\n\nBest: ${bestBook} ${fmtOdds(alert.best.price)}\nLowest: ${lowBook} ${fmtOdds(alert.lowest.price)}\nDifference: +${alert.diff}${linkLine}\n\nBooks:\n${chunk(books)}${live ? '\n\n⚠️ Live odds may move quickly.' : ''}`;
+}
+
+async function postDiscord(webhookUrl, alert) {
+  if (!webhookUrl) return;
+  const body = { content: alertMessage(alert) };
+  const res = await fetch(webhookUrl, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload)
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
-
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => '');
     throw new Error(`Discord ${res.status}: ${text}`);
   }
 }
 
-export function alertSummary(alert) {
-  return `${alert.awayTeam} @ ${alert.homeTeam} | ${alert.player} | ${marketLabel(alert.marketKey)} | ${alert.line} | ${alert.best.bookTitle} ${formatAmerican(alert.best.price)} vs ${alert.lowest.bookTitle} ${formatAmerican(alert.lowest.price)} (+${alert.diff})`;
-}
+module.exports = { postDiscord, alertMessage };

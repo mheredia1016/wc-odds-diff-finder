@@ -1,28 +1,51 @@
-# The Odds API Soccer Difference Bot
+# SportsGameOdds Discrepancy Finder
 
-Compares soccer odds across books using The Odds API and posts Discord alerts when one book is at least `MIN_ODDS_DIFF` better than the lowest book.
+Scans SportsGameOdds league-by-league, compares the same play across selected sportsbooks, and posts discrepancies to separate Discord channels for pregame and live.
 
-This version uses event-level odds, which is required for soccer player props.
-
-## Railway Variables
+## Required Railway Variables
 
 ```env
-ODDS_API_KEY=your_key
-DISCORD_WEBHOOK_URL=your_webhook
-SPORT_KEYS=soccer_fifa_world_cup
-REGIONS=us
-BOOKMAKERS=draftkings,fanduel,betmgm,betrivers,fanatics
-MARKETS=player_shots,player_shots_on_target,player_goal_scorer_anytime,player_goals_alternate,player_assists,player_tackles_alternate,player_fouls,player_to_receive_card
-MIN_ODDS_DIFF=300
-MAX_ODDS=25000
-MIN_BOOK_COUNT=2
-EVENT_MARKET_CHUNK_SIZE=1
-SCAN_INTERVAL_MINUTES=5
+SPORTSGAMEODDS_API_KEY=your_sgo_key
+PREGAME_WEBHOOK_URL=https://discord.com/api/webhooks/...
+LIVE_WEBHOOK_URL=https://discord.com/api/webhooks/...
 ```
+
+## Recommended Variables
+
+```env
+LEAGUE_IDS=MLB,NBA,NFL,NHL,WNBA,UFC,EPL,MLS,INTERNATIONAL_SOCCER
+BOOKMAKER_IDS=fanduel,draftkings,hardrockbet,bet365,thescorebet,fanatics,betmgm
+
+MIN_ODDS_DIFF=500
+LIVE_MIN_ODDS_DIFF=750
+MAX_ODDS=10000
+LIVE_MAX_ODDS=5000
+MIN_BOOK_COUNT=2
+LIVE_MIN_BOOK_COUNT=3
+
+SCAN_INTERVAL_MINUTES=5
+INCLUDE_LIVE=true
+INCLUDE_ALT_LINES=true
+INCLUDE_DEEPLINKS=true
+TOP_PREGAME_ALERTS_PER_SCAN=20
+TOP_LIVE_ALERTS_PER_SCAN=10
+```
+
+## How It Works
+
+- Pregame alerts go to `PREGAME_WEBHOOK_URL`.
+- Live alerts go to `LIVE_WEBHOOK_URL`.
+- No role pings are included.
+- Best sportsbook deeplink is included when SportsGameOdds returns one.
+- Rookie plan is supported by scanning one `leagueID` at a time.
+
+## Deploy
+
+1. Upload/push this folder to GitHub.
+2. Connect the repo to Railway.
+3. Add the variables above.
+4. Deploy.
 
 ## Notes
 
-- Player name comes from `outcome.description` when available.
-- `MAX_ODDS` prevents junk alerts like +60000.
-- `MIN_BOOK_COUNT=2` requires at least two books on the exact same player/market/line.
-- If a market returns INVALID_MARKET, remove it from `MARKETS` or keep `EVENT_MARKET_CHUNK_SIZE=1` so only that market fails.
+SportsGameOdds response shapes can vary by market. This bot uses flexible parsing for common `byBookmaker`, `odds`, and `markets` structures. If logs show events but `Total odds rows loaded: 0`, paste one full event object so the extractor can be adjusted to your plan's exact response shape.

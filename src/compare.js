@@ -1,64 +1,50 @@
-import { config } from './config.js';
-import { outcomeLine, outcomeName } from './normalize.js';
+const { describePlay, isLiveEvent } = require('./normalize');
 
-export function compareEvent(eventOdds) {
+function compareRows(rows, config) {
   const groups = new Map();
-
-  for (const book of eventOdds.bookmakers || []) {
-    for (const market of book.markets || []) {
-      for (const outcome of market.outcomes || []) {
-        const price = Number(outcome.price);
-        if (!Number.isFinite(price)) continue;
-        if (Math.abs(price) > config.maxOdds) continue;
-
-        const player = outcomeName(outcome);
-        const line = outcomeLine(outcome);
-        const key = [eventOdds.id, market.key, player, line].join('|');
-
-        if (!groups.has(key)) {
-          groups.set(key, {
-            eventId: eventOdds.id,
-            sportKey: eventOdds.sport_key,
-            sportTitle: eventOdds.sport_title,
-            homeTeam: eventOdds.home_team,
-            awayTeam: eventOdds.away_team,
-            commenceTime: eventOdds.commence_time,
-            marketKey: market.key,
-            player,
-            line,
-            prices: []
-          });
-        }
-
-        groups.get(key).prices.push({
-          bookKey: book.key,
-          bookTitle: book.title || book.key,
-          price,
-          lastUpdate: market.last_update
-        });
-      }
-    }
+  for (const row of rows) {
+    if (!groups.has(row.key)) groups.set(row.key, []);
+    groups.get(row.key).push(row);
   }
 
   const alerts = [];
 
-  for (const group of groups.values()) {
-    const uniqueBooks = new Map();
-    for (const p of group.prices) {
-      const existing = uniqueBooks.get(p.bookKey);
-      if (!existing || p.price > existing.price) uniqueBooks.set(p.bookKey, p);
+  for (const [key, groupRows] of groups.entries()) {
+    const isLive = isLiveEvent(groupRows[0].event);
+    const minBookCount = isLive ? config.liveMinBookCount : config.minBookCount;
+    const minDiff = isLive ? config.liveMinOddsDiff : config.minOddsDiff;
+    const maxOdds = isLive ? config.liveMaxOdds : config.maxOdds;
+
+    const byBook = new Map();
+    for (const row of groupRows) {
+      if (Math.abs(row.price) > maxOdds) continue;
+      const current = byBook.get(row.bookId);
+      if (!current || row.price > current.price) byBook.set(row.bookId, row);
     }
-    group.prices = [...uniqueBooks.values()].sort((a, b) => b.price - a.price);
-    if (group.prices.length < config.minBookCount) continue;
 
-    const best = group.prices[0];
-    const lowest = group.prices[group.prices.length - 1];
+    const prices = [...byBook.values()].sort((a, b) => b.price - a.price);
+    if (prices.length < minBookCount) continue;
+
+    const best = prices[0];
+    const lowest = [...prices].sort((a, b) => a.price - b.price)[0];
     const diff = best.price - lowest.price;
-    if (diff < config.minOddsDiff) continue;
+    if (diff < minDiff) continue;
 
-    alerts.push({ ...group, best, lowest, diff });
+    alerts.push({
+      key,
+      isLive,
+      event: best.event,
+      raw: best.raw,
+      description: describePlay(best.raw),
+      best,
+      lowest,
+      prices,
+      diff,
+      score: diff + prices.length * 25 + (best.deeplink ? 100 : 0) + (isLive ? 50 : 0),
+    });
   }
 
-  alerts.sort((a, b) => b.diff - a.diff);
-  return alerts;
+  return alerts.sort((a, b) => b.score - a.score);
 }
+
+module.exports = { compareRows };

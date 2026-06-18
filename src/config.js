@@ -1,23 +1,40 @@
-export const config = {
-  oddsApiKey: process.env.ODDS_API_KEY,
-  discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL,
-  sportKeys: split(process.env.SPORT_KEYS || 'soccer_fifa_world_cup'),
-  markets: split(process.env.MARKETS || 'player_shots,player_shots_on_target,player_goal_scorer_anytime,player_goals_alternate,player_assists,player_tackles_alternate,player_fouls,player_to_receive_card'),
-  regions: process.env.REGIONS || 'us',
-  bookmakers: process.env.BOOKMAKERS || '',
-  oddsFormat: process.env.ODDS_FORMAT || 'american',
-  minOddsDiff: Number(process.env.MIN_ODDS_DIFF || 300),
-  maxOdds: Number(process.env.MAX_ODDS || 25000),
-  minBookCount: Number(process.env.MIN_BOOK_COUNT || 2),
-  scanIntervalMinutes: Number(process.env.SCAN_INTERVAL_MINUTES || 5),
-  eventMarketChunkSize: Math.max(1, Number(process.env.EVENT_MARKET_CHUNK_SIZE || 1)),
-  maxEventsPerSport: Number(process.env.MAX_EVENTS_PER_SPORT || 50),
-  dryRun: String(process.env.DRY_RUN || '').toLowerCase() === 'true'
-};
+require('dotenv').config();
 
-function split(value) {
-  return String(value || '')
+function num(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function bool(name, fallback = false) {
+  const raw = process.env[name];
+  if (raw == null || raw === '') return fallback;
+  return ['1', 'true', 'yes', 'y'].includes(String(raw).toLowerCase());
+}
+
+function list(name, fallback = '') {
+  return String(process.env[name] || fallback)
     .split(',')
-    .map(v => v.trim())
+    .map(x => x.trim())
     .filter(Boolean);
 }
+
+module.exports = {
+  apiKey: process.env.SPORTSGAMEODDS_API_KEY,
+  pregameWebhookUrl: process.env.PREGAME_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL,
+  liveWebhookUrl: process.env.LIVE_WEBHOOK_URL,
+  leagueIds: list('LEAGUE_IDS', 'MLB,NBA,NFL,NHL,WNBA,UFC,EPL,MLS,INTERNATIONAL_SOCCER'),
+  bookmakerIds: list('BOOKMAKER_IDS', 'fanduel,draftkings,hardrockbet,bet365,thescorebet,fanatics,betmgm'),
+  minOddsDiff: num('MIN_ODDS_DIFF', 500),
+  liveMinOddsDiff: num('LIVE_MIN_ODDS_DIFF', 750),
+  maxOdds: num('MAX_ODDS', 10000),
+  liveMaxOdds: num('LIVE_MAX_ODDS', 5000),
+  minBookCount: num('MIN_BOOK_COUNT', 2),
+  liveMinBookCount: num('LIVE_MIN_BOOK_COUNT', 3),
+  scanIntervalMinutes: num('SCAN_INTERVAL_MINUTES', 5),
+  lookaheadHours: num('LOOKAHEAD_HOURS', 48),
+  includeLive: bool('INCLUDE_LIVE', true),
+  includeAltLines: bool('INCLUDE_ALT_LINES', true),
+  includeDeeplinks: bool('INCLUDE_DEEPLINKS', true),
+  topPregameAlertsPerScan: num('TOP_PREGAME_ALERTS_PER_SCAN', 20),
+  topLiveAlertsPerScan: num('TOP_LIVE_ALERTS_PER_SCAN', 10),
+};
