@@ -14,13 +14,14 @@ function hasExcludedMarket(row, config) {
     .join(' ')
     .toLowerCase();
 
+  // Do NOT exclude "total" globally because soccer goals/totals can be useful.
+  // This keeps player goals, anytime goalscorer, team goals, and alternate goals alive.
   const excludes = (config.excludeMarketKeywords || [
     'yes/no',
     'any runs',
     'moneyline',
     'spread',
-    'total',
-    'ml',
+    'run line',
   ]);
 
   return excludes.some(keyword => text.includes(String(keyword).toLowerCase()));
@@ -47,6 +48,7 @@ function compareRows(rows, config) {
     const byBook = new Map();
 
     for (const row of groupRows) {
+      // Only alert plus-money plays. This blocks alerts like -1600 vs -2500.
       if (row.price < 100) continue;
       if (Math.abs(row.price) > maxOdds) continue;
 
