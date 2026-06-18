@@ -31,8 +31,18 @@ async function scan() {
       const events = Array.isArray(data) ? data : (data.events || data.data || []);
       console.log(`${leagueID}: events ${events.length}`);
 
-console.log('=== FIRST EVENT ===');
-console.log(JSON.stringify(events[0], null, 2));
+const ev = events[0];
+
+console.log('=== EVENT KEYS ===');
+console.log(Object.keys(ev));
+
+console.log('=== ODDS KEYS ===');
+console.log(ev.odds ? Object.keys(ev.odds).slice(0, 20) : 'NO ev.odds');
+
+console.log('=== FIRST ODDS ITEM ===');
+const firstOdds = ev.odds ? Object.values(ev.odds)[0] : null;
+console.log(JSON.stringify(firstOdds, null, 2));
+
 process.exit(0);
       for (const event of events) {
         const rows = extractOddsRows(event, config.bookmakerIds);
